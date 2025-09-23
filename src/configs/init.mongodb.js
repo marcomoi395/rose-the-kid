@@ -6,7 +6,7 @@ class Database {
     }
 
     // Connect
-    connect(type = 'mongodb') {
+    connect() {
         mongoose
             .connect(process.env.MONGO_URL, { maxPoolSize: 50 })
             .then((_) => {
