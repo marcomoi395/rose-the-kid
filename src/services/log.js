@@ -21,22 +21,17 @@ async function flush() {
     if (queue.length === 0) return;
 
     const batch = queue.splice(0, Number(BATCH_MAX));
-    const content = batch
-        .map(
-            (i) =>
-                `\`\`\`ansi
-\u001b[36m[${i.service}]\u001b[0m \u001b[33m[${i.level}]\u001b[0m
-${i.message}
-\`\`\``
-        )
-        .join('\n')
-        .slice(0, Number(MAX_BODY));
+    const content = batch.map(renderItem).join('\n').slice(0, Number(MAX_BODY));
 
     try {
         const res = await fetch(DISCORD_WEBHOOK_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content, username: USERNAME, avatar_url: AVATAR_URL}),
+            body: JSON.stringify({
+                content,
+                username: USERNAME,
+                avatar_url: AVATAR_URL,
+            }),
         });
 
         if (res.status === 429) {
@@ -65,13 +60,72 @@ ${i.message}
     if (queue.length > 0) scheduleFlush();
 }
 
-function enqueue({
-    service = process.env.APP_NAME || 'app',
-    level = 'INFO',
-    message = '',
-}) {
-    if (!message || typeof message !== 'string') return;
-    queue.push({ service, level, message });
+function formatVND(n) {
+    try {
+        return n.toLocaleString('vi-VN');
+    } catch {
+        return String(n);
+    }
+}
+
+function formatTimeVN(iso) {
+    try {
+        return new Date(iso).toLocaleString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+        });
+    } catch {
+        return iso;
+    }
+}
+
+function renderItem(i) {
+    const CYAN = '\u001b[36m';
+    const YELLOW = '\u001b[33m';
+    const GREEN = '\u001b[32m';
+    const RED = '\u001b[31m';
+    const RESET = '\u001b[0m';
+
+    const header = `${CYAN}[${i.source}]${RESET} ${YELLOW}[${i.level}]${RESET}`;
+
+    // Nếu data đã là transaction
+    const t =
+        i?.data && typeof i.data === 'object' && 'transaction_id' in i.data
+            ? i.data
+            : null;
+
+    if (!t) {
+        // fallback: giữ nguyên chuỗi cũ nếu không phải transaction
+        const body =
+            typeof i.data === 'string'
+                ? i.data
+                : JSON.stringify(i.data, null, 2);
+        return `\`\`\`ansi
+${header}
+${body}
+\`\`\``;
+    }
+
+    const isCredit = (t.credit_amount ?? 0) > 0;
+    const typ = isCredit ? 'CREDIT' : 'DEBIT';
+    const amt = isCredit ? t.credit_amount : t.debit_amount;
+    const typC = isCredit ? `${GREEN}${typ}${RESET}` : `${RED}${typ}${RESET}`;
+    const amtC = isCredit
+        ? `${GREEN}+${formatVND(amt)}${RESET}`
+        : `${RED}-${formatVND(amt)}${RESET}`;
+
+    const when = formatTimeVN(t.date);
+
+    return `\`\`\`ansi
+${header}
+[TX:${t.transaction_id}] ${typC} ${amtC}  ${YELLOW}[${when}]${RESET}
+From : ${t.account_sender}${t.name_sender ? ' - ' + t.name_sender : ''}
+To   : ${t.account_receiver}
+Note : ${t.content}
+\`\`\``;
+}
+
+function enqueue({ source, level, data }) {
+    queue.push({ source, level, data });
     scheduleFlush();
 }
 

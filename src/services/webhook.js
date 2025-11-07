@@ -26,23 +26,16 @@ function buildApp() {
             });
         }
 
-        const token = req.get('X-Log-Token');x
+        const token = req.get('X-Log-Token');
         if (token !== LOG_SHARED_TOKEN) {
             return res.status(401).json({ ok: false, error: 'Unauthorized' });
         }
 
-        const {
-            service = 'unknown',
-            level = 'INFO',
-            message,
-        } = req.body || {};
-        if (!message || typeof message !== 'string') {
-            return res
-                .status(400)
-                .json({ ok: false, error: 'message required' });
-        }
+        const data = req.body.data || '',
+            level = req.body.event === 'payment.created' ? 'INFO' : 'UNKNOWN',
+            source = req.body.source || 'unknown';
 
-        enqueue({ service, level, message });
+        enqueue({ source, level, data });
 
         return res.json({ ok: true });
     });
