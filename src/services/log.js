@@ -77,6 +77,18 @@ function formatTimeVN(iso) {
         return iso;
     }
 }
+/*
+{
+    transaction_id: txId,
+    content: 'Test payment content (auto-generated)',
+    credit_amount: 500000,
+    debit_amount: 0,
+    date: new Date(),
+    account_receiver: '000123456789',
+    account_sender: '999987654321',
+    name_sender: 'Test Sender',
+}
+*/
 
 function renderItem(i) {
     const CYAN = '\u001b[36m';
@@ -87,40 +99,22 @@ function renderItem(i) {
 
     const header = `${CYAN}[${i.source}]${RESET} ${YELLOW}[${i.level}]${RESET}`;
 
-    // Nếu data đã là transaction
-    const t =
-        i?.data && typeof i.data === 'object' && 'transaction_id' in i.data
-            ? i.data
-            : null;
-
-    if (!t) {
-        // fallback: giữ nguyên chuỗi cũ nếu không phải transaction
-        const body =
-            typeof i.data === 'string'
-                ? i.data
-                : JSON.stringify(i.data, null, 2);
-        return `\`\`\`ansi
-${header}
-${body}
-\`\`\``;
-    }
-
-    const isCredit = (t.credit_amount ?? 0) > 0;
+    const isCredit = (i.data.credit_amount ?? 0) > 0;
     const typ = isCredit ? 'CREDIT' : 'DEBIT';
-    const amt = isCredit ? t.credit_amount : t.debit_amount;
+    const amt = isCredit ? i.data.credit_amount : i.data.debit_amount;
     const typC = isCredit ? `${GREEN}${typ}${RESET}` : `${RED}${typ}${RESET}`;
     const amtC = isCredit
         ? `${GREEN}+${formatVND(amt)}${RESET}`
         : `${RED}-${formatVND(amt)}${RESET}`;
 
-    const when = formatTimeVN(t.date);
+    const when = formatTimeVN(i.data.date);
 
     return `\`\`\`ansi
 ${header}
-[TX:${t.transaction_id}] ${typC} ${amtC}  ${YELLOW}[${when}]${RESET}
-From : ${t.account_sender}${t.name_sender ? ' - ' + t.name_sender : ''}
-To   : ${t.account_receiver}
-Note : ${t.content}
+[TX:${i.data.transaction_id}] ${typC} ${amtC}  ${YELLOW}[${when}]${RESET}
+From : ${i.data.account_sender}${i.data.name_sender ? ' - ' + i.data.name_sender : ''}
+To   : ${i.data.account_receiver}
+Note : ${i.data.content}
 \`\`\``;
 }
 
