@@ -16,9 +16,16 @@ function scheduleFlush() {
     flushTimer = setTimeout(flush, Number(BATCH_WINDOW_MS));
 }
 
+function toSafeTime(x) {
+    const t = new Date(x).getTime();
+    return Number.isFinite(t) ? t : Number.MAX_SAFE_INTEGER;
+}
+
 async function flush() {
     flushTimer = null;
     if (queue.length === 0) return;
+
+    queue.sort((a, b) => toSafeTime(a.data?.date) - toSafeTime(b.data?.date));
 
     const batch = queue.splice(0, Number(BATCH_MAX));
     const content = batch.map(renderItem).join('\n').slice(0, Number(MAX_BODY));
