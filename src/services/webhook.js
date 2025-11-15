@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
 const express = require('express');
+const notion = require('./notion');
 const { enqueue, drainAndStop } = require('./log');
 
 let httpServer;
@@ -18,7 +19,7 @@ function buildApp() {
         res.json({ ok: true, up: true });
     });
 
-    app.post('/log', (req, res) => {
+    app.post('/log', async (req, res) => {
         if (!LOG_SHARED_TOKEN || !DISCORD_WEBHOOK_URL) {
             return res.status(503).json({
                 ok: false,
@@ -35,7 +36,17 @@ function buildApp() {
             level = req.body.event === 'payment.created' ? 'INFO' : 'UNKNOWN',
             source = req.body.source || 'unknown';
 
+        // Enqueue the log entry for processing
         enqueue({ source, level, data });
+
+        // Save into Notion if it's a payment.created event
+        if (req.body.event === 'payment.created') {
+            try {
+                await notion.setDataForBudgetTracker(req.body.data);
+            } catch (error) {
+                logger.error('Lỗi khi lưu dữ liệu vào Notion:', error);
+            }
+        }
 
         return res.json({ ok: true });
     });

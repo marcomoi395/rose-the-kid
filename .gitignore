@@ -17,6 +17,7 @@ docker-compose.yml
 GEMINI.md
 .docs
 /src/public/css/styles.css
+http
 
 
 
